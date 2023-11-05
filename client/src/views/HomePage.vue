@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref, type Ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import socket from '@/utils/socketHelper';
+import ChatMessage from '@/components/ChatMessage.vue';
 
 const route = useRoute()
 const router = useRouter()
@@ -13,18 +14,52 @@ const welcomeMessage = computed(() => {
   return `Hello ${route.query.user}, Welcome to ${roomName.value}` as string
 })
 
+type MessageData = {
+  userName: string,
+  message: string,
+  time: string
+}
+
+type User = {
+  userName: string
+}
+type RoomUsers = {
+  room: string,
+  users: User[]
+}
+const messageList: Ref<MessageData[]> = ref([])
+const userList: Ref<User[]> = ref([])
 onMounted(() => {
-  socket.on('message', (messageData: object) => {
-    console.log(messageData)
+  socket.on('message', (messageData: MessageData) => {
+    messageList.value.push(messageData)
+  })
+
+  socket.on('userList', (roomUsers: RoomUsers) => {
+    userList.value = roomUsers?.users || []
   })
 })
 
+onUnmounted(() => {
+  handleRoomExit()
+})
+
 function handleRoomExit() {
-  socket.emit('leaveRoom', { user: route.query.user, room: roomName.value }, (success: boolean) => {
-    if (success) {
-      router.push({ path: '/login' });
-    }
-  })
+  const exit = window.confirm('Are you sure to leave the room ?')
+  if (exit) {
+    socket.disconnect()
+    router.replace({ path: '/login' });
+    window.location.reload()
+  }
+}
+
+const messageToSend = ref('')
+function handleSendMessage() {
+  if (!messageToSend.value) {
+    console.log('Message cannot be empty')
+    return;
+  }
+  socket.emit('chatMessage', messageToSend.value);
+  messageToSend.value = ''
 }
 
 </script>
@@ -34,9 +69,7 @@ function handleRoomExit() {
     <div class="sidebar">
       <h1 class="mb-4 text-slate-900 text-2xl">{{ roomName }}</h1>
       <ul class="user-list">
-        <li class="user">User 1</li>
-        <li class="user">User 2</li>
-        <li class="user">User 3</li>
+        <li v-for="user in userList" :key="user.userName" class="user">{{ user.userName }}</li>
       </ul>
     </div>
     <div class="main-content">
@@ -45,11 +78,11 @@ function handleRoomExit() {
         <button class="leave-button " @click="handleRoomExit">Leave room</button>
       </div>
       <div class="chat-window">
-        <!-- Display chat messages here -->
+        <Chat-Message :messages="messageList" />
       </div>
       <div class="input-area">
-        <input type="text" placeholder="Type your message here" />
-        <button class="send-button">Send</button>
+        <input type="text" placeholder="Type your message here" v-model="messageToSend"/>
+        <button class="send-button" @click="handleSendMessage">Send</button>
       </div>
     </div>
   </div>

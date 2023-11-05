@@ -56,9 +56,9 @@ function handleJoiningRoom() {
     return
   }
 
-  socket.emit('joinRoom', { user: userName.value, room: selectedRoom.value }, (success: boolean) => {
+  socket.emit('joinRoom', { userName: userName.value, room: selectedRoom.value }, (success: boolean) => {
     if (success) {
-      router.push({ path: '/home', query: { user: userName.value, room: availableRooms.find((room) => room.value === selectedRoom.value)?.name } });
+      router.push({ path: '/home', query: { user: userName.value, room: availableRooms.find((room) => room.value === selectedRoom.value)?.value } });
     }
   })
 }
